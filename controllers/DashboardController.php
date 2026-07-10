@@ -3,6 +3,7 @@
 namespace Controllers;
 
 use Model\Proyecto;
+use Model\Usuario;
 use MVC\Router;
 
 class DashboardController
@@ -13,7 +14,7 @@ class DashboardController
         isAuth();
         $id = $_SESSION['id'];
         $proyectos = Proyecto::belongsTo('propietarioId', $id);
-   
+
 
         $router->render('dashboard/index', [
             'titulo' => 'Proyectos',
@@ -67,8 +68,76 @@ class DashboardController
     public static function perfil(Router $router)
     {
         session_start();
+        isAuth();
+        $alertas = [];
+        $usuario = Usuario::find($_SESSION['id']);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $usuario->sincronizar($_POST);
+            $alertas = $usuario->validar_perfil();
+            if (empty($alertas)) {
+
+                $existeUsuario = Usuario::where('email', $usuario->email);
+                if ($existeUsuario && $existeUsuario->id !== $usuario->id) {
+                    //mensaje de error
+                    Usuario::setAlerta('error', 'Email no válido ya pertenece a otra cuenta');
+                    $alertas = $usuario->getAlertas();
+                } else {
+                    //guardar el registro
+                    $usuario->guardar();
+
+                    Usuario::setAlerta('exito', 'guardado correctamente');
+                    $alertas = $usuario->getAlertas();
+                    //asignar el nombre nuevo a la barra
+                    $_SESSION['nombre'] = $usuario->nombre;
+                }
+            }
+        }
+
+
         $router->render('dashboard/perfil', [
-            'titulo' => 'Perfil'
+            'titulo' => 'Perfil',
+            'usuario' => $usuario,
+            'alertas' => $alertas
+        ]);
+    }
+
+    public static function cambiar_password(Router $router)
+    {
+        session_start();
+        isAuth();
+        $alertas = [];
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $usuario = Usuario::find($_SESSION['id']);
+            $usuario->sincronizar($_POST);
+            $alertas = $usuario->nuevo_password();
+            if (empty($alertas)) {
+                $resultado = $usuario->comprobar_password();
+                if ($resultado) {
+                    $usuario->password = $usuario->password_nuevo;
+                    //eliminar propiedades no necesarias
+                    unset($usuario->password_actual);
+                    unset($usuario->password_nuevo);
+                    //hashear el nuevo password
+                    $usuario->hashPassword();
+                    //Actualizar
+                    $resultado = $usuario->guardar();
+                    if ($resultado) {
+                        Usuario::setAlerta('exito', 'Password guardado correctamente');
+                        $alertas = $usuario->getAlertas();
+                    }
+                  
+                } else {
+                    Usuario::setAlerta('error', 'Password incorrecto');
+                    $alertas = $usuario->getAlertas();
+                }
+            }
+        }
+
+        $router->render('dashboard/cambiar_password', [
+            'titulo' => 'Cambiar password',
+            'alertas' => $alertas
         ]);
     }
 }
