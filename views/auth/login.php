@@ -5,7 +5,7 @@
 
 
     <div class="contenedor-sm">
-        <p class="descripcion-pagina">Inicar sesión</p>
+        <p class="descripcion-pagina">Iniciar sesión</p>
 
     <?php include_once __DIR__ . '/../templates/alertas.php' ;?>
 
